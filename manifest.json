@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.fishmacc.omahome",
+  "name": "OmaHome",
+  "version": "1.0.0",
+  "author": "FishMacc",
+  "license": "MIT",
+  "description": "Read sensors and control lights, switches, and fans on your Home Assistant server from the Omarchy bar.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "OmaHome",
+    "description": "Read sensors and control devices on your Home Assistant server.",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

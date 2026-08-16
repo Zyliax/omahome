@@ -1,0 +1,10 @@
+node_modules/
+*.qmlc
+*.jsc
+
+# Working documents (spec/plan) contain local network details — never publish.
+docs/
+
+# Local session tooling
+.claude/
+.superpowers/
