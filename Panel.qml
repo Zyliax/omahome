@@ -4,7 +4,7 @@ import qs.Ui
 
 Panel {
   id: root
-  moduleName: "io.github.fishmacc.omahome"
+  moduleName: "io.github.zyliax.omahome"
   manageIpc: false
 
   property var anchorItem: null

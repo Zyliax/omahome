@@ -40,7 +40,7 @@ function isHomeAssistant(body) {
   return !!parsed && parsed.message === "API running."
 }
 
-var SUPPORTED_DOMAINS = ["light", "switch", "sensor", "binary_sensor", "fan", "input_boolean"]
+var SUPPORTED_DOMAINS = ["light", "switch", "sensor", "binary_sensor", "fan", "input_boolean", "climate"]
 var READONLY_DOMAINS = ["sensor", "binary_sensor"]
 var DEAD_STATES = ["unavailable", "unknown", ""]
 
@@ -69,6 +69,7 @@ function capabilityOf(entity) {
   if (DEAD_STATES.indexOf(String(entity.state || "")) >= 0) return "unavailable"
   var domain = entityDomain(entity.entity_id)
   if (READONLY_DOMAINS.indexOf(domain) >= 0) return "readonly"
+  if (domain === "climate") return "climate"
   var modes = attrs(entity).supported_color_modes || []
   if (domain === "light" && modes.indexOf("onoff") < 0 && modes.length > 0) return "dimmable"
   return "switchable"
@@ -108,6 +109,34 @@ function percentToBrightness(percent) {
   return Math.round(clamp(raw, 0, 100) / 100 * 255)
 }
 
+// A climate entity is on unless its HVAC mode is "off" (or empty/missing).
+function climateIsOn(entity) {
+  if (!entity) return false
+  var a = attrs(entity)
+  var mode = (a.hvac_mode !== undefined) ? a.hvac_mode : entity.state
+  return String(mode || "") !== "off"
+}
+
+function climateCurrentTemp(entity) {
+  var t = attrs(entity).current_temperature
+  return (t === undefined || t === null) ? NaN : Number(t)
+}
+
+function climateTargetTemp(entity) {
+  var t = attrs(entity).temperature
+  return (t === undefined || t === null) ? NaN : Number(t)
+}
+
+function climateMinTemp(entity) {
+  var t = attrs(entity).min_temp
+  return (t === undefined || t === null) ? 7 : Number(t)
+}
+
+function climateMaxTemp(entity) {
+  var t = attrs(entity).max_temp
+  return (t === undefined || t === null) ? 35 : Number(t)
+}
+
 // Replaces angle brackets so a server-supplied string cannot be parsed as
 // rich text by controls that render with Text.AutoText and offer no
 // textFormat override (qs.Ui Toggle in the picker). Names that genuinely
@@ -145,6 +174,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseJson, splitStatusResponse, describeFailure, isHomeAssistant,
     SUPPORTED_DOMAINS, entityDomain, isSupported, friendlyName, capabilityOf,
     isOn, formatValue, brightnessToPercent, percentToBrightness,
+    climateIsOn, climateCurrentTemp, climateTargetTemp, climateMinTemp, climateMaxTemp,
     plainText, matchesSearch, sortEntities, statesToMap
   }
 }

@@ -60,6 +60,10 @@ Column {
     root.service.callService("light", "turn_on", { entity_id: entityId, brightness_pct: percent })
   }
 
+  function applyTemperature(entityId, temp) {
+    root.service.callService("climate", "set_temperature", { entity_id: entityId, temperature: temp })
+  }
+
   function rowFor(entityId) {
     for (var i = 0; i < sensorRepeater.count; i++) {
       var item = sensorRepeater.itemAt(i)
@@ -165,6 +169,7 @@ Column {
       entity: root.stateFor(modelData.id)
       onToggleRequested: function (entityId, on) { root.applyToggle(entityId, on) }
       onBrightnessRequested: function (entityId, percent) { root.applyBrightness(entityId, percent) }
+      onTemperatureRequested: function (entityId, temp) { root.applyTemperature(entityId, temp) }
       onRemoveRequested: function (entityId) { root.removeRequested(entityId) }
     }
   }

@@ -27,6 +27,7 @@ Item {
   // never applies it, and the row must not show a phantom state forever.
   property int pendingOn: -1          // -1 none, 0 off, 1 on
   property int pendingPercent: -1
+  property real pendingTemp: NaN      // NaN = no pending target temperature
 
   // Inline failure from the most recent command, shown under the row and
   // cleared as soon as the user issues another command.
@@ -34,6 +35,7 @@ Item {
 
   signal toggleRequested(string entityId, bool on)
   signal brightnessRequested(string entityId, int percent)
+  signal temperatureRequested(string entityId, real temp)
   signal removeRequested(string entityId)
 
   readonly property string entityId: entity ? String(entity.entity_id) : entryId
@@ -42,18 +44,31 @@ Item {
   readonly property string displayName: label !== "" ? label : (entity ? Model.friendlyName(entity) : entityId)
   readonly property bool serverOn: Model.isOn(entity)
   readonly property int serverPercent: Model.brightnessToPercent(entity && entity.attributes ? entity.attributes.brightness : 0)
-  readonly property bool on: pendingOn >= 0 ? pendingOn === 1 : serverOn
+  readonly property bool serverClimateOn: Model.climateIsOn(entity)
+  readonly property real serverTemp: Model.climateTargetTemp(entity)
+  readonly property real serverClimateMin: Model.climateMinTemp(entity)
+  readonly property real serverClimateMax: Model.climateMaxTemp(entity)
+  readonly property bool on: root.capability === "climate"
+    ? (root.pendingOn >= 0 ? root.pendingOn === 1 : root.serverClimateOn)
+    : (root.pendingOn >= 0 ? root.pendingOn === 1 : root.serverOn)
   readonly property int percent: pendingPercent >= 0 ? pendingPercent : serverPercent
+  // Fall back to the mid-point of the supported range when no target is known,
+  // so the slider always has a sane starting position.
+  readonly property real temp: !isNaN(root.pendingTemp) ? root.pendingTemp
+    : (isNaN(root.serverTemp) ? (root.serverClimateMin + root.serverClimateMax) / 2 : root.serverTemp)
 
   // The optimistic value stands until the server confirms it: settling on
   // command completion instead would snap the row back to the old state and
   // make every toggle flicker.
   onServerOnChanged: if (root.pendingOn >= 0 && root.serverOn === (root.pendingOn === 1)) root.pendingOn = -1
+  onServerClimateOnChanged: if (root.pendingOn >= 0 && root.serverClimateOn === (root.pendingOn === 1)) root.pendingOn = -1
   onServerPercentChanged: if (root.pendingPercent >= 0 && root.serverPercent === root.pendingPercent) root.pendingPercent = -1
+  onServerTempChanged: if (!isNaN(root.pendingTemp) && Math.abs(root.serverTemp - root.pendingTemp) < 0.05) root.pendingTemp = NaN
 
   function settle() {
     pendingOn = -1
     pendingPercent = -1
+    pendingTemp = NaN
     pendingGuard.stop()
   }
 
@@ -77,6 +92,13 @@ Item {
     interval: 200
     repeat: false
     onTriggered: if (root.pendingPercent >= 0) root.brightnessRequested(root.entityId, root.pendingPercent)
+  }
+
+  Timer {
+    id: tempDebounce
+    interval: 300
+    repeat: false
+    onTriggered: if (!isNaN(root.pendingTemp)) root.temperatureRequested(root.entityId, root.pendingTemp)
   }
 
   Column {
@@ -106,49 +128,62 @@ Item {
         id: control
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        implicitWidth: Math.max(Math.max(readout.implicitWidth, toggle.implicitWidth), remove.visible ? remove.implicitWidth : 0)
-        implicitHeight: Math.max(Math.max(readout.implicitHeight, toggle.implicitHeight), remove.visible ? remove.implicitHeight : 0)
+        implicitWidth: row.implicitWidth
+        implicitHeight: row.implicitHeight
 
-        Text {
-          id: readout
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          visible: !root.missing && (root.capability === "readonly" || root.capability === "unavailable")
-          text: Model.formatValue(root.entity)
-          textFormat: Text.PlainText
-          color: root.capability === "unavailable" ? Qt.darker(root.foreground, 1.6) : root.foreground
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-        }
+        Row {
+          id: row
+          spacing: Style.space(6)
 
-        ToggleSwitch {
-          id: toggle
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          visible: !root.missing && (root.capability === "switchable" || root.capability === "dimmable")
-          checked: root.on
-          foreground: root.foreground
-          onToggled: {
-            // Capture the target BEFORE touching pendingOn: `root.on` is a
-            // live binding on the optimistic state, so reading it after the
-            // assignment would already yield the new value and send the
-            // inverted command (turn_off when switching on).
-            var targetOn = !root.on
-            root.pendingOn = targetOn ? 1 : 0
-            root.commandError = ""
-            pendingGuard.restart()
-            root.toggleRequested(root.entityId, targetOn)
+          Text {
+            id: readout
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !root.missing && (root.capability === "readonly" || root.capability === "unavailable")
+            text: Model.formatValue(root.entity)
+            textFormat: Text.PlainText
+            color: root.capability === "unavailable" ? Qt.darker(root.foreground, 1.6) : root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
           }
-        }
 
-        Button {
-          id: remove
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          visible: root.missing && root.removable
-          text: "Remove"
-          foreground: root.foreground
-          onClicked: root.removeRequested(root.entityId)
+          Text {
+            id: currentTemp
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !root.missing && root.capability === "climate"
+            text: isNaN(Model.climateCurrentTemp(root.entity)) ? "—" : (Model.climateCurrentTemp(root.entity) + "°")
+            textFormat: Text.PlainText
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body
+          }
+
+          ToggleSwitch {
+            id: toggle
+            anchors.verticalCenter: parent.verticalCenter
+            visible: !root.missing && (root.capability === "switchable" || root.capability === "dimmable" || root.capability === "climate")
+            checked: root.on
+            foreground: root.foreground
+            onToggled: {
+              // Capture the target BEFORE touching pendingOn: `root.on` is a
+              // live binding on the optimistic state, so reading it after the
+              // assignment would already yield the new value and send the
+              // inverted command (turn_off when switching on).
+              var targetOn = !root.on
+              root.pendingOn = targetOn ? 1 : 0
+              root.commandError = ""
+              pendingGuard.restart()
+              root.toggleRequested(root.entityId, targetOn)
+            }
+          }
+
+          Button {
+            id: remove
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.missing && root.removable
+            text: "Remove"
+            foreground: root.foreground
+            onClicked: root.removeRequested(root.entityId)
+          }
         }
       }
     }
@@ -182,6 +217,38 @@ Item {
         // drag release — debounce so a wheel burst sends one brightness call
         // instead of one call per tick.
         brightnessDebounce.restart()
+      }
+    }
+
+    Text {
+      width: parent.width
+      visible: root.capability === "climate"
+      text: "Target " + (isNaN(root.temp) ? "—" : (root.temp.toFixed(1) + "°"))
+      textFormat: Text.PlainText
+      color: root.foreground
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+
+    PanelSlider {
+      width: parent.width
+      // Shown whenever the entity is a climate device, including while it is
+      // off, so the setpoint can still be inspected and adjusted.
+      visible: root.capability === "climate"
+      bar: root.bar
+      minimum: root.serverClimateMin
+      maximum: root.serverClimateMax
+      step: 0.5
+      integer: false
+      value: root.temp
+      onMoved: function (v) { var s = Math.round(v * 2) / 2; root.pendingTemp = s }
+      onReleased: function (v) {
+        var s = Math.round(v * 2) / 2
+        root.pendingTemp = s
+        root.commandError = ""
+        pendingGuard.restart()
+        // Same wheel-burst debounce as the brightness slider above.
+        tempDebounce.restart()
       }
     }
   }

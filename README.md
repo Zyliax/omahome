@@ -7,7 +7,7 @@ server from the Omarchy bar.
 
 ## Install
 
-    omarchy plugin add https://github.com/FishMacc/omahome.git --enable
+    omarchy plugin add https://github.com/Zyliax/omahome.git --enable
 
 ## Connect to your Home Assistant
 
@@ -27,6 +27,8 @@ you enter, nowhere else.
 - Click the house icon to open the panel; Escape closes it.
 - Toggles switch devices on and off. Dimmable lights get a brightness
   slider (drag, or scroll over it).
+- Climate entities show the current room temperature, an on/off toggle, and a
+  target-temperature slider (drag, or scroll over it) that appears while on.
 - **Add devices** reopens the picker. The gear button returns to the
   connection setup, where **Disconnect** deletes the stored token and the
   server address — your device selection is kept for the next connect.
@@ -35,7 +37,7 @@ you enter, nowhere else.
 
 ## Remove
 
-    omarchy plugin remove io.github.fishmacc.omahome
+    omarchy plugin remove io.github.zyliax.omahome
 
 This does not delete your stored token. Remove it separately:
 
@@ -50,7 +52,7 @@ This does not delete your stored token. Remove it separately:
 
 ## Supported entities
 
-`light` (on/off and brightness), `switch`, `fan`, `input_boolean`, `sensor`, `binary_sensor`.
+`light` (on/off and brightness), `switch`, `fan`, `input_boolean`, `sensor`, `binary_sensor`, `climate` (on/off and target temperature).
 
 ## Requirements
 

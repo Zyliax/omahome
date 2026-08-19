@@ -217,3 +217,51 @@ test("plainText neutralizes angle brackets so names cannot render as HTML", () =
   assert.strictEqual(M.plainText(null), "")
   assert.strictEqual(M.plainText(undefined), "")
 })
+
+const climate = {
+  entity_id: "climate.werkkamer_room_temperature",
+  state: "heat",
+  attributes: {
+    friendly_name: "Werkkamer",
+    hvac_mode: "heat",
+    current_temperature: 21.5,
+    temperature: 22.0,
+    min_temp: 10,
+    max_temp: 30
+  }
+}
+
+test("isSupported accepts climate", () => {
+  assert.strictEqual(M.isSupported("climate.werkkamer_room_temperature"), true)
+  assert.strictEqual(M.isSupported("climate.x"), true)
+})
+
+test("capabilityOf classifies climate as its own capability", () => {
+  assert.strictEqual(M.capabilityOf(climate), "climate")
+})
+
+test("climateIsOn is true for any non-off mode and false for off", () => {
+  assert.strictEqual(M.climateIsOn(climate), true)
+  assert.strictEqual(M.climateIsOn({ entity_id: "climate.x", state: null, attributes: { hvac_mode: "off" } }), false)
+  assert.strictEqual(M.climateIsOn({ entity_id: "climate.x", state: "off", attributes: {} }), false)
+})
+
+test("climateIsOn treats a missing/null entity as off without throwing", () => {
+  assert.strictEqual(M.climateIsOn(null), false)
+  assert.strictEqual(M.climateIsOn(undefined), false)
+})
+
+test("climate helpers read the temperature attributes with fallbacks", () => {
+  assert.strictEqual(M.climateCurrentTemp(climate), 21.5)
+  assert.strictEqual(M.climateTargetTemp(climate), 22.0)
+  assert.strictEqual(M.climateMinTemp(climate), 10)
+  assert.strictEqual(M.climateMaxTemp(climate), 30)
+})
+
+test("climate helpers fall back when attributes are missing", () => {
+  const bare = { entity_id: "climate.x", state: "heat", attributes: {} }
+  assert.ok(isNaN(M.climateCurrentTemp(bare)))
+  assert.ok(isNaN(M.climateTargetTemp(bare)))
+  assert.strictEqual(M.climateMinTemp(bare), 7)
+  assert.strictEqual(M.climateMaxTemp(bare), 35)
+})
