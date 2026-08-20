@@ -232,9 +232,9 @@ Item {
 
     PanelSlider {
       width: parent.width
-      // Shown whenever the entity is a climate device, including while it is
-      // off, so the setpoint can still be inspected and adjusted.
-      visible: root.capability === "climate"
+      // Shown only while the climate device is on. When off, there is no
+      // active setpoint to adjust, so the slider is hidden.
+      visible: root.capability === "climate" && root.on
       bar: root.bar
       minimum: root.serverClimateMin
       maximum: root.serverClimateMax
